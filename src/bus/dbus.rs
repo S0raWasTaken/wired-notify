@@ -7,13 +7,13 @@ use std::time::Duration;
 
 use dbus::{
     self,
-    MessageType,
     arg::{self, PropMap, RefArg},
-    blocking::{Connection, stdintf::org_freedesktop_dbus::RequestNameReply},
+    blocking::{stdintf::org_freedesktop_dbus::RequestNameReply, Connection},
     channel::MatchingReceiver,
-    message::{MatchRule},
+    message::MatchRule,
+    MessageType,
 };
-use dbus_crossroads::{Crossroads};
+use dbus_crossroads::Crossroads;
 use image::{self, DynamicImage, ImageBuffer};
 
 use chrono::{offset::Local, DateTime};
@@ -54,7 +54,17 @@ impl OrgFreedesktopNotifications for Notify {
         Ok(capabilities)
     }
 
-    fn notify(&mut self, app_name: String, replaces_id: u32, app_icon: String, summary: String, body: String, actions: Vec<String>, hints: arg::PropMap, expire_timeout: i32) -> Result<u32, dbus::MethodErr> {
+    fn notify(
+        &mut self,
+        app_name: String,
+        replaces_id: u32,
+        app_icon: String,
+        summary: String,
+        body: String,
+        actions: Vec<String>,
+        hints: arg::PropMap,
+        expire_timeout: i32,
+    ) -> Result<u32, dbus::MethodErr> {
         // The spec says that:
         // If `replaces_id` is 0, we should create a fresh id and notification.
         // If `replaces_id` is not 0, we should create a replace the notification with that id,
@@ -122,15 +132,8 @@ pub fn init_dbus_thread() -> (JoinHandle<()>, Receiver<Message>) {
         .expect("Failed to register name.");
 
     // Be helpful to the user.
-    match reply {
-        RequestNameReply::InQueue => {
-            println!("In queue for notification bus name -- is another notification daemon running?")
-        }
-        _ => {},
-        //RequestNameReply::PrimaryOwner => {}, // this happens if there are no other notification daemons.
-                                                // we should get the NameAcquired signal shortly.
-        //RequestNameReply::Exists => {}  // should never happen, since `do_not_queue` is false.
-        //RequestNameReply::AlreadyOwner => {}
+    if reply == RequestNameReply::InQueue {
+        println!("In queue for notification bus name -- is another notification daemon running?")
     };
 
     let match_rule = MatchRule::new()
@@ -143,22 +146,26 @@ pub fn init_dbus_thread() -> (JoinHandle<()>, Receiver<Message>) {
                 println!("Notification bus name acquired.");
 
                 // Stop listening for signals -- name was grabbed.
-                return false
+                return false;
             }
         }
 
         // Keep listening for signals.
         true
-    }).expect("Failed to add match.");
+    })
+    .expect("Failed to add match.");
 
     let mut cr = Crossroads::new();
     let token = dbus_codegen::register_org_freedesktop_notifications::<Notify>(&mut cr);
     cr.insert(PATH, &[token], Notify { sender });
 
-    c.start_receive(dbus::message::MatchRule::new_method_call(), Box::new(move |msg, conn| {
-        cr.handle_message(msg, conn).unwrap();
-        true
-    }));
+    c.start_receive(
+        dbus::message::MatchRule::new_method_call(),
+        Box::new(move |msg, conn| {
+            cr.handle_message(msg, conn).unwrap();
+            true
+        }),
+    );
 
     unsafe {
         DBUS_CONN = Some(c);
@@ -224,7 +231,7 @@ pub struct Notification {
 
     pub urgency: Urgency,
 
-    #[serde(serialize_with="serialize_datetime")]
+    #[serde(serialize_with = "serialize_datetime")]
     pub time: DateTime<Local>,
     pub timeout: i32,
 }
@@ -232,7 +239,8 @@ pub struct Notification {
 use serde::Serializer;
 
 fn serialize_datetime<S>(datetime: &DateTime<Local>, serializer: S) -> Result<S::Ok, S::Error>
-where S: Serializer
+where
+    S: Serializer,
 {
     serializer.serialize_i64(datetime.timestamp())
 }
@@ -304,12 +312,11 @@ impl Notification {
 
             // @TODO: this path shouldn't be active if app_icon is empty?
             let img_path = Path::new(path);
-            let x = image::open(img_path).ok();
 
             //let _end = std::time::Instant::now();
             //dbg!(end - start);
 
-            x
+            image::open(img_path).ok()
         }
 
         fn image_from_data(data: &VecDeque<Box<dyn RefArg>>) -> Option<DynamicImage> {
@@ -329,8 +336,7 @@ impl Notification {
             // stuff is sent at the same time the same time, so we should sanity check the image.
             // https://github.com/dunst-project/dunst/blob/3f3082efb3724dcd369de78dc94d41190d089acf/src/icon.c#L316
             let pixelstride = (channels * bits_per_sample + 7) / 8;
-            let len_expected =
-                (height - 1) * rowstride + width * pixelstride;
+            let len_expected = (height - 1) * rowstride + width * pixelstride;
             let len_actual = bytes.len() as i32;
             if len_actual != len_expected {
                 eprintln!(
@@ -341,14 +347,8 @@ impl Notification {
             }
 
             let x = match channels {
-                3 => {
-                    ImageBuffer::from_raw(width as u32, height as u32, bytes)
-                        .map(DynamicImage::ImageRgb8)
-                }
-                4 => {
-                    ImageBuffer::from_raw(width as u32, height as u32, bytes)
-                        .map(DynamicImage::ImageRgba8)
-                }
+                3 => ImageBuffer::from_raw(width as u32, height as u32, bytes).map(DynamicImage::ImageRgb8),
+                4 => ImageBuffer::from_raw(width as u32, height as u32, bytes).map(DynamicImage::ImageRgba8),
                 _ => {
                     eprintln!("Unsupported hint image format!  Couldn't load hint image.");
                     None
@@ -362,7 +362,6 @@ impl Notification {
         }
 
         let app_image = image_from_path(&app_icon);
-
 
         // Structs are stored internally in the rust dbus implementation as VecDeque.
         // https://github.com/diwic/dbus-rs/issues/363
@@ -398,15 +397,14 @@ impl Notification {
 
         let tag = arg::prop_cast::<String>(&hints, "wired-tag").cloned();
 
-        let percentage: Option<f32>;
-        if let Some(value) = arg::prop_cast::<i32>(&hints, "value") {
+        let percentage: Option<f32> = if let Some(value) = arg::prop_cast::<i32>(&hints, "value") {
             // This should be ok since we only support values from 0 to 100.
             let v = *value as f32;
             let p = f32::clamp(v * 0.01, 0.0, 1.0);
-            percentage = Some(p)
+            Some(p)
         } else {
-            percentage = None;
-        }
+            None
+        };
 
         let mut timeout = expire_timeout;
         if timeout <= 0 {
@@ -416,7 +414,7 @@ impl Notification {
         Self {
             id,
             tag,
-            app_name: app_name.to_owned(),
+            app_name,
             summary,
             body,
             actions: actions_map,

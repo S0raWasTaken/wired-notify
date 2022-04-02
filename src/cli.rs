@@ -54,7 +54,7 @@ impl CLIListener {
 
     pub fn process_messages(
         &self,
-        mut manager: &mut NotifyWindowManager,
+        manager: &mut NotifyWindowManager,
         el: &EventLoopWindowTarget<()>
     ) {
         // Since we're non-blocking, mostly this is just std::io::ErrorKind::WouldBlock.
@@ -62,7 +62,7 @@ impl CLIListener {
         // I don't love the idea of spamming stderr here, however.
         match self.listener.accept() {
             Ok((socket, _addr)) => {
-                match handle_socket_message(&mut manager, el, socket) {
+                match handle_socket_message(manager, el, socket) {
                     Ok(_) => (),
                     Err(e) => eprintln!("Error while handling socket message: {:?}", e),
                 }
@@ -117,7 +117,7 @@ pub fn handle_socket_message(
         };
 
         println!("Recived socket message: {}", line);
-        if let Some((command, args)) = line.split_once(":") {
+        if let Some((command, args)) = line.split_once(':') {
             match command {
                 "drop" => {
                     if args == "all" {
@@ -129,7 +129,7 @@ pub fn handle_socket_message(
                 }
                 "action" => {
                     let (notif_id, action_id) = args
-                        .split_once(",")
+                        .split_once(',')
                         .ok_or(CLIError::Parse("Malformed action request."))?;
 
                     let id = get_window_id(notif_id, manager)?;
@@ -261,7 +261,7 @@ pub fn process_cli(args: Vec<String>) -> Result<ShouldRun, String> {
         }
 
         if let Some(to_action) = matches.opt_str("a") {
-            let (notification, action) = match to_action.split_once(":") {
+            let (notification, action) = match to_action.split_once(':') {
                 Some(na) => na,
                 None => {
                     return Err("Missing ':' in action argument.\n\

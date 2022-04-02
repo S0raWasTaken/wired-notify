@@ -98,12 +98,12 @@ impl LayoutBlock {
             match c {
                 RenderCriteria::Summary => if !n.summary.is_empty() { should_draw = false },
                 RenderCriteria::Body => if !n.body.is_empty() { should_draw = false },
-                RenderCriteria::AppImage => if !n.app_image.is_none() { should_draw = false },
-                RenderCriteria::HintImage => if !n.hint_image.is_none() { should_draw = false },
+                RenderCriteria::AppImage => if n.app_image.is_some() { should_draw = false },
+                RenderCriteria::HintImage => if n.hint_image.is_some() { should_draw = false },
                 RenderCriteria::AppName => if !n.app_name.is_empty() { should_draw = false },
-                RenderCriteria::Progress => if !n.percentage.is_none() { should_draw = false },
-                RenderCriteria::ActionDefault => if !n.get_default_action().is_none() { should_draw = false },
-                RenderCriteria::ActionOther(i) => if !n.get_other_action(*i).is_none() { should_draw = false },
+                RenderCriteria::Progress => if n.percentage.is_some() { should_draw = false },
+                RenderCriteria::ActionDefault => if n.get_default_action().is_some() { should_draw = false },
+                RenderCriteria::ActionOther(i) => if n.get_other_action(*i).is_some() { should_draw = false },
             }
         }
 
@@ -146,9 +146,9 @@ impl LayoutBlock {
         // right?
         let (rect, acc_rect) = {
             let rect = if self.should_draw(&window.notification) {
-                let rect = self.params.draw(&self.hook, &self.offset, parent_rect, window)
-                    .expect("Invalid cairo surface state.");
-                rect
+                
+                self.params.draw(&self.hook, &self.offset, parent_rect, window)
+                    .expect("Invalid cairo surface state.")
             } else {
                 // If block shouldn't be rendered, then we should be safe to just return an
                 // empty rect.
@@ -254,7 +254,7 @@ impl LayoutBlock {
 
     pub fn as_notification_block(&self) -> &NotificationBlockParameters {
         if let LayoutElement::NotificationBlock(p) = &self.params {
-            return p;
+            p
         } else {
             panic!("Tried to cast a LayoutBlock as type NotificationBlock when it was something else.");
         }

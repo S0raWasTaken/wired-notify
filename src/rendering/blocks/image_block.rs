@@ -74,7 +74,7 @@ impl DrawableLayoutElement for ImageBlockParameters {
             rect.set_xy(pos.x, pos.y);
 
             let (x, y) = (pos.x + self.padding.left, pos.y + self.padding.top);
-            window.context.set_source_surface(&img_sfc, x, y)?;
+            window.context.set_source_surface(img_sfc, x, y)?;
             maths_utility::cairo_path_rounded_rectangle(
                 &window.context,
                 x,
@@ -117,13 +117,11 @@ impl DrawableLayoutElement for ImageBlockParameters {
             ImageType::AppThenHint => window
                 .notification
                 .app_image
-                .as_ref()
-                .or_else(|| window.notification.hint_image.as_ref()),
+                .as_ref().or(window.notification.hint_image.as_ref()),
             ImageType::HintThenApp => window
                 .notification
                 .hint_image
-                .as_ref()
-                .or_else(|| window.notification.app_image.as_ref()),
+                .as_ref().or(window.notification.app_image.as_ref()),
         };
 
         if let Some(img) = maybe_image {

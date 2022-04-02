@@ -1,8 +1,8 @@
 use std::collections::{HashMap, VecDeque};
 use std::time::Duration;
 
-use dbus::message::SignalArgs;
 use dbus::channel::Sender;
+use dbus::message::SignalArgs;
 use dbus::strings::Path;
 use winit::{
     dpi::PhysicalPosition, event, event::ElementState, event::MouseButton, event::WindowEvent,
@@ -66,7 +66,10 @@ impl NotifyWindowManager {
                 let window = NotifyWindow::new(el, notification.clone(), layout.clone(), self);
 
                 // Find this notification's layout and push the window there.
-                let windows = self.layout_windows.get_mut(&layout.name).expect("Somehow created a new layout.");
+                let windows = self
+                    .layout_windows
+                    .get_mut(&layout.name)
+                    .expect("Somehow created a new layout.");
                 windows.push(window);
 
                 // If we've exceeded max notifications, then mark the top-most one for destroy.
@@ -92,18 +95,18 @@ impl NotifyWindowManager {
         let mut maybe_windows = vec![];
         //let mut maybe_window = None;
         for w in self.layout_windows.values_mut().flatten() {
-            if notification_meets_layout_criteria(w.layout.as_ref().unwrap(), &notification) &&
-               ((w.notification.id == notification.id && cfg.replacing_enabled) ||
-               (w.notification.app_name == notification.app_name &&
-                w.notification.tag.is_some() &&
-                w.notification.tag == notification.tag)) {
-
+            if notification_meets_layout_criteria(w.layout.as_ref().unwrap(), &notification)
+                && ((w.notification.id == notification.id && cfg.replacing_enabled)
+                    || (w.notification.app_name == notification.app_name
+                        && w.notification.tag.is_some()
+                        && w.notification.tag == notification.tag))
+            {
                 maybe_windows.push(w);
                 //maybe_window = Some(w)
             }
         }
 
-        if maybe_windows.len() > 0 {
+        if !maybe_windows.is_empty() {
             for w in maybe_windows {
                 w.replace_notification(notification.clone());
             }
@@ -150,7 +153,7 @@ impl NotifyWindowManager {
         }
 
         // TODO: SHOULD_CHECK_IDLE? Somewhere?
-        // TODO: there should probably be a way to make this so we only need to set new windows  
+        // TODO: there should probably be a way to make this so we only need to set new windows
         // update mode instead of just brute forcing them.  but maybe this is fine anyway?
         // Definitely less bug prone.
         // Our idle threshold granularity is 1s, so we can save time by only checking at that
@@ -168,7 +171,7 @@ impl NotifyWindowManager {
                                 .flatten()
                                 .for_each(|w| w.update_mode = UpdateModes::DRAW);
                         }
-                    },
+                    }
                     Err(e) => eprintln!("{}", e),
                 }
             }
@@ -184,14 +187,18 @@ impl NotifyWindowManager {
             }
 
             // Grab the layout associated with these windows.
-            let layout = cfg.layouts.iter().find(|l| &l.name == layout_name)
+            let layout = cfg
+                .layouts
+                .iter()
+                .find(|l| &l.name == layout_name)
                 .expect("Failed to find matching layout.");
             let layout_params = layout.as_notification_block();
 
             // Grab a winit window reference to use to call winit functions.
             // The functions here are just convenience functions to avoid needing a reference
             // to the event loop -- they don't relate to the individual window.
-            let maybe_monitor = self.base_window
+            let maybe_monitor = self
+                .base_window
                 .available_monitors()
                 .nth(layout_params.monitor as usize)
                 .or_else(|| self.base_window.primary_monitor());
@@ -205,8 +212,7 @@ impl NotifyWindowManager {
             };
 
             let (pos, size) = (monitor.position(), monitor.size());
-            let monitor_rect =
-                Rect::new(pos.x.into(), pos.y.into(), size.width.into(), size.height.into());
+            let monitor_rect = Rect::new(pos.x.into(), pos.y.into(), size.width.into(), size.height.into());
             let mut prev_rect = monitor_rect;
 
             let mut real_idx = 0;
@@ -223,18 +229,13 @@ impl NotifyWindowManager {
                 // For the second and more notifications, we attach to the previous
                 // notification.
                 let pos = if real_idx == 0 {
-                    LayoutBlock::find_anchor_pos(
-                        &layout.hook,
-                        &layout.offset,
-                        &prev_rect,
-                        &window_rect,
-                    )
+                    LayoutBlock::find_anchor_pos(&layout.hook, &layout.offset, &prev_rect, &window_rect)
                 } else {
                     LayoutBlock::find_anchor_pos(
                         &layout_params.notification_hook,
                         &layout_params.gap,
                         &prev_rect,
-                        &window_rect
+                        &window_rect,
                     )
                 };
 
@@ -325,19 +326,24 @@ impl NotifyWindowManager {
             }
 
             let action_id = if pressed == config.shortcuts.notification_action1
-                || pressed == config.shortcuts.notification_action1_and_close {
+                || pressed == config.shortcuts.notification_action1_and_close
+            {
                 0
             } else if pressed == config.shortcuts.notification_action2
-                || pressed == config.shortcuts.notification_action2_and_close {
+                || pressed == config.shortcuts.notification_action2_and_close
+            {
                 1
             } else if pressed == config.shortcuts.notification_action3
-                || pressed == config.shortcuts.notification_action3_and_close {
+                || pressed == config.shortcuts.notification_action3_and_close
+            {
                 2
             } else if pressed == config.shortcuts.notification_action4
-                || pressed == config.shortcuts.notification_action4_and_close {
+                || pressed == config.shortcuts.notification_action4_and_close
+            {
                 3
             } else if pressed == config.shortcuts.notification_interact
-                || pressed == config.shortcuts.notification_interact_and_close {
+                || pressed == config.shortcuts.notification_interact_and_close
+            {
                 if let Some(window) = self.find_window_mut(window_id) {
                     window.process_mouse_click();
                 }
@@ -374,9 +380,14 @@ impl NotifyWindowManager {
                 id: notification.id,
             };
             let path = Path::new(bus::dbus::PATH).expect("Failed to create DBus path.");
-            let _result = bus::dbus::get_connection().channel().send(message.to_emit_message(&path));
+            let _result = bus::dbus::get_connection()
+                .channel()
+                .send(message.to_emit_message(&path));
         } else {
-            eprintln!("Tried to trigger an action with id: {}, but couldn't find any matches.", action);
+            eprintln!(
+                "Tried to trigger an action with id: {}, but couldn't find any matches.",
+                action
+            );
         }
     }
 
@@ -397,18 +408,21 @@ impl NotifyWindowManager {
     // Potentially, this call is delayed and we've already dropped that window, which is definitely
     // plausible.
     pub fn find_window(&self, window_id: WindowId) -> Option<&NotifyWindow> {
-        self.layout_windows.values().flatten().find(|w| w.winit.id() == window_id)
+        self.layout_windows
+            .values()
+            .flatten()
+            .find(|w| w.winit.id() == window_id)
     }
 
     pub fn find_window_mut(&mut self, window_id: WindowId) -> Option<&mut NotifyWindow> {
-        self.layout_windows.values_mut().flatten().find(|w| w.winit.id() == window_id)
+        self.layout_windows
+            .values_mut()
+            .flatten()
+            .find(|w| w.winit.id() == window_id)
     }
 
     pub fn find_window_ordered(&self, num: usize) -> Option<WindowId> {
-        let mut windows: Vec<&NotifyWindow> =
-            self.layout_windows.values()
-                               .flatten()
-                               .collect();
+        let mut windows: Vec<&NotifyWindow> = self.layout_windows.values().flatten().collect();
 
         // `sort_unstable` is faster, but windows with the exact same creation timestamp may by
         // shifted in ordering, which is undersireable.  DateTime is probably precise enough to get
@@ -439,7 +453,10 @@ impl NotifyWindowManager {
     // @TODO: how about a shortcut for dropping all windows on one monitor?  Support multi-monitor
     // better first.
     pub fn drop_windows(&mut self) {
-        self.layout_windows.values_mut().flatten().for_each(|w| w.marked_for_destroy = true);
+        self.layout_windows
+            .values_mut()
+            .flatten()
+            .for_each(|w| w.marked_for_destroy = true);
         self.dirty = true;
         /*
         #[allow(clippy::for_kv_map)]
@@ -464,7 +481,11 @@ impl NotifyWindowManager {
 
     pub fn drop_notification(&mut self, id: u32) -> bool {
         // This should be Some, otherwise we were given a bad id.
-        let maybe_window = self.layout_windows.values_mut().flatten().find(|w| w.notification.id == id);
+        let maybe_window = self
+            .layout_windows
+            .values_mut()
+            .flatten()
+            .find(|w| w.notification.id == id);
         if let Some(window) = maybe_window {
             window.marked_for_destroy = true;
             self.dirty = true;
@@ -475,7 +496,7 @@ impl NotifyWindowManager {
     }
 
     pub fn has_windows(&self) -> bool {
-        self.layout_windows.values().any(|m| m.len() > 0)
+        self.layout_windows.values().any(|m| !m.is_empty())
     }
 }
 
